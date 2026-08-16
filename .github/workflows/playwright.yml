@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.target != 'all' && format('["{0}"]', inputs.target) || '["runoob","govee-community"]') }}
+        target: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.target != 'all' && format('["{0}"]', inputs.target) || github.event_name == 'schedule' && vars.SCHEDULE_TARGETS_JSON || '["runoob","govee-community"]') }}
 
     env:
       CI: "true"
