@@ -2,33 +2,49 @@ name: Playwright E2E Tests
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Remote project to test
+        required: true
+        default: runoob
+        type: choice
+        options:
+          - runoob
+          - govee-community
+          - all
 
   push:
     branches:
       - main
 
   schedule:
-    # 北京时间每天凌晨 2 点，GitHub cron 使用 UTC
+    # GitHub cron uses UTC; this runs daily at 02:00 Asia/Shanghai.
     - cron: "0 18 * * *"
 
 permissions:
   contents: read
 
 concurrency:
-  group: playwright-${{ github.ref }}
+  group: playwright-${{ github.ref }}-${{ github.event.inputs.target || 'all' }}
   cancel-in-progress: true
 
 jobs:
-  chromium-tests:
-    name: Chromium UI Tests
+  playwright:
+    name: ${{ matrix.target }} Chromium Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.target != 'all' && format('["{0}"]', inputs.target) || '["runoob","govee-community"]') }}
+
     env:
       CI: "true"
-      BASE_URL: ${{ vars.BASE_URL }}
-      E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
-      E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+      TARGET: ${{ matrix.target }}
+      GOVEE_TEST_EMAIL: ${{ secrets.GOVEE_TEST_EMAIL }}
+      GOVEE_TEST_PASSWORD: ${{ secrets.GOVEE_TEST_PASSWORD }}
+      QQ_IMAP_AUTH_CODE: ${{ secrets.QQ_IMAP_AUTH_CODE }}
 
     steps:
       - name: Checkout repository
@@ -46,16 +62,16 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright tests
+      - name: Run ${{ matrix.target }} tests
         run: npm run test:e2e
 
-      - name: Upload Playwright artifacts
+      - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: playwright-results-${{ github.run_number }}
+          name: playwright-${{ matrix.target }}-${{ github.run_number }}
           path: |
-            playwright-report/
-            test-results/
+            playwright-report/${{ matrix.target }}/
+            test-results/${{ matrix.target }}/
           if-no-files-found: ignore
           retention-days: 14
